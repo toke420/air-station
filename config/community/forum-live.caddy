@@ -1,0 +1,13 @@
+# AirStation community forum (NodeBB). Installed by scripts/community.py finish.
+{$AIR_FORUM_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy nodebb:4567
+	header Strict-Transport-Security "max-age=31536000"
+	request_body {
+		max_size 25MB
+	}
+	log {
+		output stdout
+		format console
+	}
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the AirStation NAS sync every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=20
+Persistent=false
+
+[Install]
+WantedBy=timers.target

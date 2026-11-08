@@ -1,0 +1,52 @@
+# MediaMTX: OBS ingest bridge. Rendered by scripts/init.py into
+# data/generated/mediamtx.yml (passwords filled in). Edit this template, then
+# run `python3 scripts/init.py` again and `docker compose up -d mediamtx`.
+#
+# OBS publishes video+audio to path "obs" over SRT (recommended, encrypted
+# optional) or RTMP. As soon as the stream is ready, MediaMTX runs ffmpeg to
+# extract the audio and push it to Liquidsoap's /obs harbor mount, which takes
+# over the radio. When OBS stops, ffmpeg exits and AutoDJ returns.
+
+logLevel: info
+logDestinations: [stdout]
+
+api: no
+metrics: no
+pprof: no
+playback: no
+
+# RTSP is used only inside the container, by the ffmpeg hook below.
+rtsp: yes
+rtspAddress: :8554
+rtmp: yes
+rtmpAddress: :1935
+hls: no
+webrtc: no
+srt: yes
+srtAddress: :8890
+
+authMethod: internal
+authInternalUsers:
+  # The ffmpeg hook reads locally without credentials.
+  - user: any
+    pass:
+    ips: ['127.0.0.1', '::1']
+    permissions:
+      - action: read
+  # OBS publishes with these credentials.
+  - user: obs
+    pass: @@OBS_PUBLISH_PASSWORD@@
+    ips: []
+    permissions:
+      - action: publish
+        path: obs
+
+paths:
+  obs:
+    runOnReady: >-
+      ffmpeg -nostdin -hide_banner -loglevel warning
+      -rtsp_transport tcp -i rtsp://127.0.0.1:$RTSP_PORT/$MTX_PATH
+      -vn -c:a libmp3lame -b:a 192k -ar 44100 -ac 2
+      -content_type audio/mpeg -legacy_icecast 1 -f mp3
+      icecast://source:@@OBS_HARBOR_PASSWORD@@@liquidsoap:8005/obs
+    runOnReadyRestart: yes

@@ -1,0 +1,13 @@
+# Per-install state: never commit (passwords, database, music cache, uploads)
+.env
+data/
+secrets/
+config/Caddyfile.d/*.caddy
+!config/Caddyfile.d/00-readme.caddy
+# Python / editors / releases
+__pycache__/
+*.pyc
+.venv/
+.idea/
+.vscode/
+*.zip

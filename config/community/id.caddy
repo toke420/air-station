@@ -1,0 +1,10 @@
+# AirStation single sign-on (Rauthy). Installed by scripts/community.py.
+{$AIR_ID_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy rauthy:8080
+	header Strict-Transport-Security "max-age=31536000"
+	log {
+		output stdout
+		format console
+	}
+}

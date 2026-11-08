@@ -1,0 +1,76 @@
+AIRSTATION SOFTWARE LICENCE (Lifetime)
+Copyright (c) 2026 [SELLER NAME / BUSINESS NAME]. All rights reserved.
+
+=====================================================================================
+DRAFT FOR REVIEW. Before you sell AirStation, have this licence checked by a lawyer
+for the country you sell from, then fill in the [bracketed] parts and delete this box.
+=====================================================================================
+
+This licence is an agreement between you (the "Licensee") and [SELLER NAME] (the
+"Licensor") about the AirStation software, including its source code, scripts,
+configuration files, web pages, images and documentation (the "Software").
+
+1. TRIAL
+   You may install and use the Software free of charge for 30 days to evaluate it.
+   After the trial, using the Studio administration pages requires a licence key.
+
+2. LICENCE GRANT
+   When you buy a licence and receive a licence key, the Licensor grants you a
+   perpetual, non-exclusive, non-transferable licence to:
+   a) install and run the Software for ONE radio station (one public domain name) at
+      a time, on servers you control or rent;
+   b) change the Software's code, configuration and appearance for your own station;
+   c) make backup copies.
+   "Lifetime" means for as long as you comply with this licence. It includes the
+   versions released while the Licensor sells this edition; it does not promise
+   future features, support or a time limit for updates.
+
+3. RESTRICTIONS
+   You may not:
+   a) sell, give away, publish, sublicense or otherwise distribute the Software or
+      modified versions of it, in whole or in part, or your licence key;
+   b) remove, disable or work around the licence check, or help others do so;
+   c) offer the Software to third parties as a hosted service (for example, running
+      stations for other people) without a separate written agreement;
+   d) remove copyright or licence notices.
+   Theme packs (your own images, texts, colours and CSS/JavaScript) may be shared
+   freely, as long as they contain no part of the Software.
+
+4. ACTIVATION
+   The licence key is activated online. Activation sends the licence server the key,
+   the station's domain name, a random installation identifier and the Software
+   version, and the installation checks in about once a week. No other data is sent.
+   You may move your licence to another server by deactivating the old one in the
+   Studio, or by contacting the Licensor.
+
+5. THIRD-PARTY SOFTWARE
+   The Software works with separate programs that are not part of it and are
+   distributed under their own licences (for example Icecast, Liquidsoap, Caddy,
+   MediaMTX, NodeBB and Rauthy). See THIRD-PARTY-NOTICES.md. This licence does not
+   change your rights under those licences.
+
+6. YOUR CONTENT AND YOUR RESPONSIBILITIES
+   You are responsible for the music and other content you broadcast, including any
+   broadcasting or performance licences required where you and your listeners are,
+   and for complying with privacy law for any listener statistics you collect.
+
+7. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+   INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT,
+   TO THE EXTENT PERMITTED BY LAW. [Consumer-law note: in some countries, e.g.
+   Australia, consumer guarantees cannot be excluded; your lawyer will adjust this.]
+
+8. LIMITATION OF LIABILITY
+   TO THE EXTENT PERMITTED BY LAW, THE LICENSOR'S TOTAL LIABILITY UNDER THIS LICENCE
+   IS LIMITED TO THE AMOUNT YOU PAID FOR IT, AND THE LICENSOR IS NOT LIABLE FOR ANY
+   INDIRECT OR CONSEQUENTIAL LOSS, LOSS OF DATA, AUDIENCE OR REVENUE.
+
+9. REFUNDS AND TERMINATION
+   [Refund policy, e.g. "Refunds within 14 days of purchase on request."] A refunded
+   or charged-back licence is cancelled. The Licensor may cancel a licence that is
+   used in breach of this agreement. When a licence is cancelled, the Studio returns
+   to its unlicensed state; the station itself is not switched off.
+
+10. GENERAL
+   This licence is governed by the laws of [STATE / COUNTRY]. If a part of it is
+   unenforceable, the rest still applies. Contact: [SUPPORT E-MAIL].

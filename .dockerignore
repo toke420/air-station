@@ -1,0 +1,9 @@
+data
+secrets
+web
+docs
+tests
+.env
+.git
+**/__pycache__
+*.zip

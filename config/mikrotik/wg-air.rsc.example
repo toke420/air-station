@@ -1,0 +1,28 @@
+# AirStation - RouterOS 7 WireGuard + SMB reference (EXAMPLE VALUES).
+# Prefer the generated file: run `bash scripts/wg-setup.sh keys` on the VPS,
+# which fills in the VPS key and IP and saves /root/air-mikrotik.rsc.
+# Full walkthrough: docs/MIKROTIK.md
+
+# 1. Tunnel interface + address (router side is .2, VPS is .1)
+/interface wireguard add name=wg-air listen-port=13232 mtu=1420 comment="AirStation VPS link"
+/ip address add address=10.77.88.2/30 interface=wg-air comment="AirStation VPS link"
+
+# 2. The VPS as a peer. The router dials out, so no port forward is needed.
+/interface wireguard peers add interface=wg-air public-key="VPS_PUBLIC_KEY=" \
+    endpoint-address=VPS_PUBLIC_IP endpoint-port=51820 \
+    allowed-address=10.77.88.1/32 persistent-keepalive=25s comment="AirStation VPS"
+
+# 3. Let only the VPS reach SMB (TCP 445) over the tunnel. Put it above any drop rule.
+/ip firewall filter add chain=input in-interface=wg-air src-address=10.77.88.1 \
+    protocol=tcp dst-port=445 action=accept comment="AirStation: VPS reads SMB share"
+
+# 4. SMB: a read-only account for the VPS, and allow the tunnel interface.
+/ip smb users add name=airsync password=CHANGE_ME read-only=yes
+/ip smb print
+#   If "interfaces" is not "all", add wg-air to what is already there, e.g.:
+#   /ip smb set interface=bridge,wg-air
+/ip smb shares print
+#   If your share has valid-users set, add airsync to that list.
+
+# 5. Router public key (give this to: bash scripts/wg-setup.sh peer KEY)
+/interface wireguard print detail where name=wg-air

@@ -1,0 +1,112 @@
+# Caddy obtains and renews the HTTPS certificate for AIR_DOMAIN automatically.
+# The DNS A record must point at this VPS and ports 80/443 must be open.
+{
+	email {$AIR_ACME_EMAIL}
+}
+
+{$AIR_DOMAIN} {
+	# Audio streams: pass straight through with no buffering or compression.
+	@stream path /radio.mp3 /radio-low.mp3
+	handle @stream {
+		reverse_proxy icecast:8000 {
+			flush_interval -1
+			# Icecast only sees Caddy. Pass the listener's address along (inside the
+			# User-Agent, which Icecast records) for Studio > Listeners. The API turns
+			# it into a city-level location and never stores the address itself.
+			header_up User-Agent "{http.request.header.User-Agent} [airstation-ip:{http.request.remote.host}]"
+		}
+	}
+
+	# HLS (/radio.m3u8) for IPTV apps and playlists. The API serves the playlist (that's
+	# how HLS listeners are counted); the audio segments come straight from memory.
+	handle /radio.m3u8 {
+		reverse_proxy api:8080
+	}
+	@hlssegment path_regexp ^/radio_[0-9]+\.ts$
+	handle @hlssegment {
+		root * /srv/hls
+		header Content-Type video/mp2t
+		header Cache-Control "public, max-age=60"
+		header Access-Control-Allow-Origin *
+		file_server
+	}
+
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	# Liquidsoap-only endpoints are never exposed publicly.
+	handle /internal/* {
+		respond 404
+	}
+
+	handle_path /art/* {
+		root * /srv/art
+		header Cache-Control "public, max-age=86400"
+		file_server
+	}
+
+	handle_path /branding/* {
+		root * /srv/branding
+		header Cache-Control "public, max-age=86400"
+		# Uploaded SVGs can never run scripts, even when opened directly.
+		header Content-Security-Policy "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
+		file_server
+	}
+
+	# Home and Live pages with the station's own title, description and texts already in
+	# the HTML (the API writes them to data/site, see pages.py). Until they exist, the
+	# plain pages from web/ are served below.
+	@sitepage {
+		path / /live/
+		file {
+			root /srv/site
+			try_files {path}index.html
+		}
+	}
+	@sitefile {
+		path /index.html /live/index.html
+		file {
+			root /srv/site
+			try_files {path}
+		}
+	}
+	handle @sitepage {
+		root * /srv/site
+		rewrite * {file_match.relative}
+		encode zstd gzip
+		header Cache-Control "no-cache"
+		file_server
+	}
+	handle @sitefile {
+		root * /srv/site
+		encode zstd gzip
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	handle {
+		root * /srv/web
+		encode zstd gzip
+		header /assets/* Cache-Control "public, max-age=3600"
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# Extra sites (e.g. the community forum and sign-on, added by
+# scripts/community.py). Files ending in .caddy in config/Caddyfile.d.
+import /etc/caddy/Caddyfile.d/*.caddy

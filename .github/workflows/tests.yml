@@ -1,0 +1,31 @@
+name: tests
+on:
+  push:
+  pull_request:
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Unit and API tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Shell scripts parse
+        run: for f in scripts/*.sh scripts/airctl; do bash -n "$f"; done
+      - name: JavaScript parses
+        run: for f in web/assets/js/*.js web/admin/*.js; do node --check "$f"; done
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose file validates (with and without the community profile)
+        run: |
+          cp .env.example .env
+          mkdir -p secrets
+          for s in $(grep -oE "file: ./secrets/[a-z_]+" compose.yaml | cut -d/ -f3); do echo x > "secrets/$s"; done
+          docker compose config -q
+          COMPOSE_PROFILES=community docker compose config -q

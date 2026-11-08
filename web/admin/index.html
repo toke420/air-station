@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Studio | AirStation</title>
+  <link rel="icon" type="image/png" href="/api/brand/icon">
+  <link rel="stylesheet" href="/admin/admin.css?v=2.7.0">
+</head>
+<body>
+<header class="bar">
+  <img src="/api/brand/icon" alt="" width="30" height="30">
+  <b><span data-station-name>AirStation</span> Studio</b>
+  <nav class="tabs" data-tabs hidden>
+    <button data-tab="dashboard" class="on">Dashboard</button>
+    <button data-tab="listeners">Listeners</button>
+    <button data-tab="library">Library</button>
+    <button data-tab="duplicates">Duplicates</button>
+    <button data-tab="playlists">Playlists</button>
+    <button data-tab="schedule">Schedule</button>
+    <button data-tab="settings">Site settings</button>
+    <button data-tab="appearance">Appearance</button>
+    <button data-tab="connect">Go live</button>
+    <button data-tab="licence">Licence</button>
+  </nav>
+  <button class="link" data-logout hidden>Log out</button>
+</header>
+
+<div class="licbar" data-licbar hidden><span data-licbar-text></span> <button class="btn small" type="button" data-licbar-go>Enter licence key</button></div>
+<main>
+  <!-- Login -->
+  <section class="panel login" data-view="login" hidden>
+    <h1>Studio login</h1>
+    <form data-login-form>
+      <label>Password <input type="password" name="password" autocomplete="current-password" required autofocus></label>
+      <button class="btn primary">Log in</button>
+      <p class="hint">The password is in <code>/opt/air-station/secrets/admin_ui_password</code> (or run <code>airctl creds</code>).</p>
+    </form>
+  </section>
+
+  <!-- Dashboard -->
+  <section data-view="dashboard" hidden>
+    <div class="grid2">
+      <div class="panel">
+        <h2>On air <span class="pill" data-d-source>…</span></h2>
+        <div class="np"><b data-d-title>…</b><span data-d-artist></span><small data-d-show></small></div>
+        <div class="row">
+          <button class="btn" data-skip title="Skip the current AutoDJ track">Skip track</button>
+          <label class="switch"><input type="checkbox" data-live-toggle> Allow live takeover</label>
+          <label>Record
+            <select data-record>
+              <option value="off">Off</option>
+              <option value="live">Live sets only</option>
+              <option value="all">Everything</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint" data-d-liq></p>
+        <p class="waiting" data-d-waiting hidden>DJ connected: goes on air when the current song ends. Press <b>Go live now</b> to cut in.</p>
+      </div>
+      <div class="panel">
+        <h2>Health</h2>
+        <dl class="stats" data-d-stats></dl>
+        <div class="meter"><i data-d-cachebar></i></div>
+        <p class="hint" data-d-cache></p>
+        <p class="hint bad" data-d-emergency hidden></p>
+        <p data-d-sync class="hint"></p>
+        <button class="btn" data-rescan>Rescan NAS now</button>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Coming up</h2>
+        <ol class="tlist" data-d-queue></ol>
+      </div>
+      <div class="panel">
+        <h2>Recently played</h2>
+        <ol class="tlist" data-d-history></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- Listeners (statistics) -->
+  <section data-view="listeners" hidden>
+    <div class="st-head">
+      <div class="seg" role="group" aria-label="Period" data-st-range>
+        <button data-range="24h">24 hours</button>
+        <button data-range="7d" class="on">7 days</button>
+        <button data-range="30d">30 days</button>
+        <button data-range="90d">90 days</button>
+        <button data-range="365d">12 months</button>
+      </div>
+      <span class="hint" data-st-updated></span>
+      <a class="btn small" data-st-csv href="/api/admin/stats/sessions.csv?range=7d" download>Download sessions (CSV)</a>
+    </div>
+    <p class="notice" data-st-notice hidden></p>
+    <div class="kpis" data-st-kpis></div>
+
+    <div class="panel">
+      <h2>Where your audience is
+        <span class="map-keys">
+          <label class="switch"><input type="checkbox" data-st-layer="listeners" checked><i class="key s1"></i> Listeners</label>
+          <label class="switch"><input type="checkbox" data-st-layer="web"><i class="key s2"></i> Website visits</label>
+          <span class="key-live"><i class="key s1 live"></i> Listening now</span>
+        </span>
+      </h2>
+      <div class="map" data-st-map><p class="map-msg" data-st-mapmsg>Loading map…</p></div>
+      <p class="hint">Circle size shows listening time (or visits) from each place. Locations are approximate (city level) and come from an offline IP database; no addresses are stored. <span data-st-geo></span></p>
+    </div>
+
+    <div class="panel">
+      <h2>Listeners over time <small class="hint" data-st-tlnote></small></h2>
+      <div class="chart" data-st-timeline></div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2>Countries</h2>
+        <div class="tablewrap short"><table data-st-countries></table></div>
+      </div>
+      <div class="panel">
+        <h2>Listening now <span class="pill" data-st-livecount>0</span></h2>
+        <div class="tablewrap short"><table data-st-live></table></div>
+      </div>
+    </div>
+
+    <div class="grid3">
+      <div class="panel"><h2>How long people listen</h2><div data-st-lengths></div></div>
+      <div class="panel"><h2>Players and apps</h2><div data-st-players></div></div>
+      <div class="panel"><h2>Streams</h2><div data-st-mounts></div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Website <small class="hint" data-st-websum></small></h2>
+      <div class="grid3">
+        <div><h3>Pages</h3><div data-st-pages></div></div>
+        <div><h3>Came from</h3><div data-st-referrers></div></div>
+        <div><h3>Devices</h3><div data-st-devices></div><h3>Countries</h3><div data-st-webcountries></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Library -->
+  <section data-view="library" hidden>
+    <div class="panel">
+      <div class="row filters">
+        <input type="search" placeholder="Search artist, title, album, path" data-l-q>
+        <select data-l-folder><option value="">All folders</option></select>
+        <select data-l-status>
+          <option value="">Any status</option>
+          <option value="cached">Cached on VPS</option>
+          <option value="never">Never played</option>
+          <option value="disabled">Disabled</option>
+          <option value="missing">Missing from NAS</option>
+          <option value="bad">Unplayable</option>
+        </select>
+        <select data-l-playlist><option value="">Any playlist</option></select>
+        <span class="hint" data-l-total></span>
+      </div>
+      <div class="row">
+        <label>Selected tracks:
+          <select data-l-target><option value="">Add to manual playlist…</option></select>
+        </label>
+        <button class="btn" data-l-add>Add</button>
+        <button class="btn" data-l-remove>Remove from playlist</button>
+      </div>
+      <div class="tablewrap">
+        <table class="tracks">
+          <thead><tr><th><input type="checkbox" data-l-all aria-label="Select all"></th><th>Title</th><th>Artist</th><th>Genre</th><th>Folder</th><th>Len</th><th>Plays</th><th>Status</th><th></th></tr></thead>
+          <tbody data-l-rows></tbody>
+        </table>
+      </div>
+      <div class="row pager"><button class="btn" data-l-prev>‹ Prev</button><span data-l-page></span><button class="btn" data-l-next>Next ›</button></div>
+    </div>
+  </section>
+
+  <!-- Playlists -->
+  <section data-view="playlists" hidden>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Playlists <button class="btn small" data-p-new>New playlist</button></h2>
+        <div data-p-list></div>
+        <p class="hint">The <b>default</b> playlist plays whenever no scheduled show has its own playlist. Every playlist uses fair shuffle: least-recently-played tracks first, random among them, with an artist gap and a no-repeat window.</p>
+      </div>
+      <form class="panel" data-p-form hidden>
+        <h2 data-p-heading>New playlist</h2>
+        <input type="hidden" name="id">
+        <label>Name <input name="name" required maxlength="80"></label>
+        <label>Type
+          <select name="kind">
+            <option value="all">Whole library</option>
+            <option value="folders">NAS folders</option>
+            <option value="genres">Genres (from tags)</option>
+            <option value="manual">Hand-picked tracks</option>
+          </select>
+        </label>
+        <fieldset data-p-folders><legend>Folders (sub-folders included)</legend><div class="checks" data-p-folderlist></div></fieldset>
+        <fieldset data-p-genres><legend>Genres (a track matches if its genre contains any of these)</legend><div class="checks" data-p-genrelist></div>
+          <label>Extra genre words, comma separated <input name="extra_genres" placeholder="e.g. drill, boom bap"></label></fieldset>
+        <p class="hint" data-p-manualhint>Add tracks from the Library tab (tick tracks, then “Add to manual playlist”).</p>
+        <div class="row">
+          <label>No repeat for (hours) <input type="number" name="no_repeat_hours" min="0" max="1440" value="24"></label>
+          <label>Artist gap (tracks) <input type="number" name="artist_gap" min="0" max="50" value="4"></label>
+        </div>
+        <div class="row">
+          <label class="switch"><input type="checkbox" name="enabled" checked> Enabled</label>
+          <label class="switch"><input type="checkbox" name="is_default"> Default rotation</label>
+        </div>
+        <div class="row">
+          <button class="btn primary">Save</button>
+          <button class="btn" type="button" data-p-cancel>Cancel</button>
+          <button class="btn danger" type="button" data-p-delete>Delete</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Schedule -->
+  <section data-view="schedule" hidden>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Shows <button class="btn small" data-s-new>New show</button></h2>
+        <p class="hint" data-s-tz></p>
+        <div class="week" data-s-week></div>
+      </div>
+      <form class="panel" data-s-form hidden>
+        <h2 data-s-heading>New show</h2>
+        <input type="hidden" name="id">
+        <label>Show name <input name="name" required maxlength="80"></label>
+        <label>Host / DJ <input name="host" maxlength="80"></label>
+        <label>Description <input name="description" maxlength="200" placeholder="Hip Hop • Rap • Grime"></label>
+        <fieldset><legend>Days</legend><div class="checks days" data-s-days></div></fieldset>
+        <div class="row">
+          <label>Start <input type="time" name="start_time" required></label>
+          <label>End <input type="time" name="end_time" required></label>
+        </div>
+        <p class="hint">An end time earlier than the start runs past midnight (22:00–02:00).</p>
+        <label>AutoDJ playlist during this show
+          <select name="playlist_id" data-s-playlists><option value="">Default rotation</option></select>
+        </label>
+        <div class="row">
+          <label class="switch"><input type="checkbox" name="is_live"> Live DJ show (shown in red)</label>
+          <label class="switch"><input type="checkbox" name="enabled" checked> Enabled</label>
+        </div>
+        <div class="row">
+          <button class="btn primary">Save</button>
+          <button class="btn" type="button" data-s-cancel>Cancel</button>
+          <button class="btn danger" type="button" data-s-delete>Delete</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Settings -->
+  <section data-view="settings" hidden>
+    <form class="panel" data-settings-form>
+      <h2>Site settings</h2>
+      <div class="grid2 tight">
+        <label>Station name <input name="station_name"></label>
+        <label>Tagline <input name="tagline"></label>
+        <label>Rotation name (when no show is on) <input name="rotation_name"></label>
+        <label>Rotation description <input name="rotation_description"></label>
+      </div>
+      <label>About text <textarea name="about" rows="4"></textarea></label>
+      <label>Genres / words on the left of the banner (comma separated) <input name="genres_banner"></label>
+      <p class="hint">Logo, pictures, page texts, colours and custom CSS/JS are in the <b>Appearance</b> tab.</p>
+      <h3>Requests</h3>
+      <div class="row">
+        <label class="switch"><input type="checkbox" name="requests_enabled"> Listener requests on</label>
+        <label>Minutes between requests per listener <input type="number" name="request_gap_minutes" min="0"></label>
+        <label>Hours before a track can be requested again <input type="number" name="request_repeat_hours" min="0"></label>
+      </div>
+      <h3>Social links</h3>
+      <div class="grid2 tight">
+        <label>Discord <input name="social.discord" type="url"></label>
+        <label>Instagram <input name="social.instagram" type="url"></label>
+        <label>YouTube <input name="social.youtube" type="url"></label>
+        <label>X <input name="social.x" type="url"></label>
+        <label>Spotify <input name="social.spotify" type="url"></label>
+        <label>Backup stream URL <input name="backup_stream_url" type="url" placeholder="https://backup.example.com/stream.mp3"></label>
+      </div>
+      <h3>Community</h3>
+      <div class="grid2 tight">
+        <label>Forum URL <input name="community.forum_url" type="url"></label>
+        <label>Sign-up URL <input name="community.signup_url" type="url"></label>
+        <label>Log-in URL <input name="community.login_url" type="url"></label>
+        <label>Video chat URL <input name="community.video_chat_url" type="url" placeholder="https://meet.jit.si/YourRoomName"></label>
+      </div>
+      <label>Community highlights (one per line: Title | subtitle | meta)
+        <textarea name="community.posts" rows="4" placeholder="New Music Friday | What are you listening to? | 12 replies"></textarea></label>
+      <h3>Listener statistics</h3>
+      <div class="row">
+        <label class="switch"><input type="checkbox" name="stats_enabled"> Count listeners and website visits (Listeners tab)</label>
+        <label>Keep statistics for (days) <input type="number" name="stats_retention_days" min="7" max="3650"></label>
+      </div>
+      <p class="hint">Only a one-way hash of each address, the player name and an approximate (city-level) location are kept. See docs/STATISTICS.md.</p>
+      <h3>Listener map</h3>
+      <div class="grid2 tight">
+        <label>Map style
+          <select name="map_style" data-map-style>
+            <option value="osm-dark">OpenStreetMap, dark (no key needed)</option>
+            <option value="osm">OpenStreetMap, standard colours (no key needed)</option>
+            <option value="carto-dark">CARTO Dark Matter (free CARTO key)</option>
+            <option value="carto-voyager">CARTO Voyager (free CARTO key)</option>
+            <option value="custom">Other tile server (enter its address)</option>
+          </select></label>
+        <label data-map-field="carto">CARTO key <input name="map_carto_key" autocomplete="off" spellcheck="false" placeholder="from the e-mail CARTO sends you"></label>
+        <label data-map-field="custom">Tile address <input name="map_tiles_url" type="url" spellcheck="false" placeholder="https://tiles.example.com/{z}/{x}/{y}.png"></label>
+        <label data-map-field="custom">Credit shown on the map <input name="map_attribution" placeholder="© OpenStreetMap contributors"></label>
+      </div>
+      <p class="hint" data-map-field="carto">Get a free key at <a href="https://carto.com/basemaps/apikey" target="_blank" rel="noopener">carto.com/basemaps/apikey</a> (no account; free for non-commercial use up to 5 million tiles a month). In CARTO's dashboard you can restrict the key to your domain.</p>
+      <p class="hint" data-map-field="osm">Map data and tiles from OpenStreetMap, used under its tile policy (fine for a Studio page that only you open).</p>
+      <h3>Live Video page (Owncast)</h3>
+      <div class="grid2 tight">
+        <label>Owncast address <input name="owncast_url" type="url" placeholder="https://cast.example.com"></label>
+        <label class="switch" style="align-self:end"><input type="checkbox" name="live_video_enabled"> Show the Live Video tab on the site</label>
+      </div>
+      <div class="row"><button class="btn primary">Save settings</button></div>
+    </form>
+  </section>
+
+  <!-- Go live -->
+  <section data-view="settings" hidden data-also-settings>
+    <div class="panel">
+      <h2>Track covers</h2>
+      <p class="hint">The default cover for tracks without one is set in <b>Appearance</b>.</p>
+      <p class="hint" data-art-stats></p>
+      <button class="btn" type="button" data-art-retry>Re-check covers for tracks without art</button>
+    </div>
+  </section>
+
+
+  <!-- Appearance -->
+  <section data-view="appearance" hidden>
+    <div class="panel">
+      <h2>Images <a class="btn small" href="/" target="_blank" rel="noopener">View site ↗</a></h2>
+      <p class="hint">Every picture on the public site can be replaced. Each card shows where the
+        picture is used and the size and format that fit best. Uploads replace the old file straight
+        away; visitors see the change on their next page load. To move a whole look between
+        stations, use theme packs: <code>airctl branding export</code> / <code>import</code> (docs/THEMING.md).</p>
+      <div class="slots" data-a-slots></div>
+    </div>
+
+    <form class="panel" data-a-texts-form>
+      <h2>Page texts</h2>
+      <p class="hint">Leave a box empty to keep the default (shown in grey). <code>{station}</code> becomes the
+        station name and <code>{year}</code> the current year; <code>*word*</code> highlights a word in the
+        accent colour. In the larger boxes each line becomes a new line on the page. Station name,
+        tagline, about text and the banner genres are in <b>Site settings</b>.</p>
+      <div class="grid2 tight" data-a-texts></div>
+      <div class="row"><button class="btn primary">Save texts</button></div>
+    </form>
+
+    <form class="panel" data-a-theme-form>
+      <h2>Colours</h2>
+      <p class="hint">The accent colour is used for links, buttons, icons and the player; the highlight
+        colour for live badges, the Listen button and highlighted words. For anything else use custom CSS.</p>
+      <div class="row">
+        <label>Accent <input type="color" name="accent"></label>
+        <label>Highlight <input type="color" name="highlight"></label>
+        <button class="btn primary">Save colours</button>
+        <button class="btn" type="button" data-a-theme-reset>Restore default colours</button>
+      </div>
+    </form>
+
+    <form class="panel" data-a-code-form>
+      <h2>Custom CSS and JavaScript</h2>
+      <p class="hint">Added to every public page (homepage and Live Video), never to this Studio, so a
+        mistake can't lock you out. If the site looks broken after a change, open it with
+        <code>?nocustom</code> at the end of the address (e.g. <code>/?nocustom</code>) to see it without your
+        code, then fix or clear it here. The CSS variables you can override are listed in docs/THEMING.md.</p>
+      <label>Custom CSS
+        <textarea class="code" name="custom_css" rows="12" spellcheck="false"
+          placeholder=":root {
+  --head: 'Bebas Neue', Impact, sans-serif;
+}
+.hero-name { letter-spacing: .1em; }"></textarea></label>
+      <label>Custom JavaScript
+        <textarea class="code" name="custom_js" rows="9" spellcheck="false"
+          placeholder="// e.g. an analytics snippet or a chat widget loader"></textarea></label>
+      <p class="hint warn">Only add JavaScript you trust: it runs in every visitor's browser. Up to 100 KB each.</p>
+      <div class="row"><button class="btn primary">Save CSS and JavaScript</button></div>
+    </form>
+  </section>
+
+  <!-- Duplicates -->
+  <section data-view="duplicates" hidden>
+    <div class="panel">
+      <h2>Duplicate tracks</h2>
+      <p class="hint">Matches are by <b>same artist and title</b> (ignoring things like "(Official Video)", "[HD]", "feat." and "Remastered") or by <b>identical file size</b>. "Keep" disables the other copies so AutoDJ won't play them; nothing on your drive is deleted (the share is read-only). Use the paths to tidy the drive at home if you like.</p>
+      <div class="row">
+        <label class="switch"><input type="checkbox" data-dup-resolved> Show groups already resolved</label>
+        <span class="hint" data-dup-summary></span>
+      </div>
+      <div data-dup-list></div>
+    </div>
+  </section>
+
+  <!-- Licence -->
+  <section data-view="licence" hidden>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Licence <span class="pill" data-lic-status>…</span></h2>
+        <p class="lic-msg" data-lic-message></p>
+        <dl class="kv lic-kv" data-lic-details></dl>
+        <div class="row">
+          <button class="btn" type="button" data-lic-check hidden>Check now</button>
+          <button class="btn danger" type="button" data-lic-deactivate hidden>Deactivate on this server</button>
+        </div>
+        <p class="hint" data-lic-deactivate-hint hidden>Deactivate before moving the station to a new server, then enter the same key there. A server that stops checking in frees its place by itself after 30 days.</p>
+      </div>
+      <div class="panel" data-lic-activate>
+        <h2>Enter your licence key</h2>
+        <form data-lic-form>
+          <label>Licence key <input name="key" autocomplete="off" spellcheck="false" placeholder="AIRS-XXXXX-XXXXX-XXXXX-XXXXX" maxlength="40"></label>
+          <div class="row"><button class="btn primary">Activate</button><a class="btn" data-lic-buy target="_blank" rel="noopener" hidden>Buy a licence</a></div>
+          <p class="hint">The key is in your purchase e-mail. Activating sends the key, this station's domain and a random install id to the licence server; nothing else.</p>
+        </form>
+        <details class="l-offline">
+          <summary>No internet on this server? Use a certificate</summary>
+          <p class="hint">Send the seller your licence key, this domain and this install id; you'll get a certificate to paste here.</p>
+          <form data-lic-certform>
+            <label>Certificate <textarea name="certificate" rows="4" spellcheck="false" placeholder="AIRCERT.…"></textarea></label>
+            <button class="btn">Use certificate</button>
+          </form>
+        </details>
+      </div>
+    </div>
+  </section>
+  <section data-view="connect" hidden>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Mixxx</h2>
+        <p class="hint">Preferences → Live Broadcasting → add a connection. When you press “Enable Live Broadcasting” the radio switches to you within a few seconds; stop it and AutoDJ comes back with a fresh track.</p>
+        <dl class="kv" data-c-mixxx></dl>
+      </div>
+      <div class="panel">
+        <h2>OBS</h2>
+        <p class="hint">Settings → Stream → Service: Custom. SRT is recommended (better on shaky connections). Audio: AAC or Opus, 48 kHz. Start Streaming to go on air.</p>
+        <dl class="kv" data-c-obs></dl>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Share your stream</h2>
+      <p class="hint">Addresses for apps, radio directories and IPTV playlists. Players that can't play the MP3 streams (many IPTV and TV apps) use <b>HLS</b>.</p>
+      <dl class="kv" data-c-streams></dl>
+      <p class="hint" data-c-hls></p>
+      <label>Ready-made entry for M3U / IPTV playlist maintainers
+        <textarea class="code" rows="4" readonly data-c-m3u></textarea></label>
+    </div>
+  </section>
+</main>
+<div class="toast" data-toast></div>
+<script src="/admin/worldmap.js?v=2.7.0" defer></script>
+<script src="/admin/admin.js?v=2.7.0" defer></script>
+</body>
+</html>

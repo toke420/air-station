@@ -1,0 +1,2 @@
+# Site snippets in this folder are loaded by config/Caddyfile.
+# scripts/community.py copies the forum / sign-on sites here.

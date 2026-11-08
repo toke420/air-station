@@ -1,0 +1,129 @@
+/* AirStation theme for NodeBB (Harmony theme, dark skin).
+   Copy from https://radio.example.com/assets/community/nodebb-theme.css into
+   Admin > Appearance > Custom Content > Custom CSS/LESS, enable it,
+   then Save. Works on top of the "Darkly" or "Cyborg" skin. */
+
+:root, [data-bs-theme="dark"], body.skin-darkly, body.skin-cyborg {
+  --air-blue: #1f9bff;
+  --air-blue-2: #0b6fd6;
+  --air-red: #ff2b2b;
+  --air-red-2: #d61616;
+  --air-bg: #07090d;
+  --air-panel: #10151d;
+  --air-panel-2: #151b25;
+  --air-line: #222b38;
+  --air-text: #eef2f7;
+  --air-muted: #9aa6b6;
+
+  --bs-body-bg: var(--air-bg);
+  --bs-body-color: var(--air-text);
+  --bs-secondary-color: var(--air-muted);
+  --bs-secondary-bg: var(--air-panel);
+  --bs-tertiary-bg: var(--air-panel-2);
+  --bs-border-color: var(--air-line);
+  --bs-primary: var(--air-blue);
+  --bs-primary-rgb: 31, 155, 255;
+  --bs-link-color: var(--air-blue);
+  --bs-link-color-rgb: 31, 155, 255;
+  --bs-link-hover-color: #6cc0ff;
+  --bs-link-hover-color-rgb: 108, 192, 255;
+  --bs-danger: var(--air-red);
+  --bs-danger-rgb: 255, 43, 43;
+  --bs-font-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(31, 155, 255, .10), transparent 60%),
+    radial-gradient(900px 500px at 90% 0%, rgba(255, 43, 43, .10), transparent 60%),
+    var(--air-bg) !important;
+  color: var(--air-text);
+}
+
+/* Headings in the station's condensed type */
+h1, h2, h3, .h1, .h2, .h3, .category-header h1, [component="topic/header"] h1,
+.fs-2, .tracking-tight {
+  font-family: "Oswald", "Arial Narrow", Impact, sans-serif;
+  letter-spacing: .02em;
+}
+
+/* Left sidebar and bottom bar (Harmony) */
+.sidebar, nav.sidebar, .bottombar, .bottombar-nav {
+  background: #0b0f15 !important;
+  border-color: var(--air-line) !important;
+}
+.sidebar .nav-link:hover, .sidebar .nav-link.active, .sidebar .active > .nav-link {
+  color: var(--air-blue) !important;
+}
+
+/* Cards, lists, dropdowns */
+.card, .list-group-item, .dropdown-menu, .modal-content, .popover, .bg-body,
+[component="category/topic"], [component="categories/category"], .topic-list-header {
+  background-color: var(--air-panel) !important;
+  border-color: var(--air-line) !important;
+}
+[component="category/topic"]:hover, [component="categories/category"]:hover {
+  background-color: var(--air-panel-2) !important;
+}
+.border, .border-top, .border-bottom, hr { border-color: var(--air-line) !important; }
+.text-muted, .text-secondary { color: var(--air-muted) !important; }
+
+/* Buttons: red primary call to action, blue accents */
+.btn-primary {
+  --bs-btn-bg: var(--air-red);
+  --bs-btn-border-color: var(--air-red);
+  --bs-btn-hover-bg: var(--air-red-2);
+  --bs-btn-hover-border-color: var(--air-red-2);
+  --bs-btn-active-bg: var(--air-red-2);
+  --bs-btn-color: #fff;
+  box-shadow: 0 6px 22px rgba(255, 43, 43, .25);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--air-blue);
+  --bs-btn-border-color: var(--air-blue);
+  --bs-btn-hover-bg: var(--air-blue);
+  --bs-btn-hover-border-color: var(--air-blue);
+}
+.btn-ghost:hover, .btn-light, .btn-outline-secondary:hover { background-color: var(--air-panel-2) !important; }
+
+/* Form fields */
+.form-control, .form-select, .composer textarea, .write {
+  background-color: #0a0e14 !important;
+  border-color: #2c3747 !important;
+  color: var(--air-text) !important;
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--air-blue) !important;
+  box-shadow: 0 0 0 .2rem rgba(31, 155, 255, .25) !important;
+}
+
+/* Badges, tags, unread markers */
+.badge.text-bg-primary, .tag-item, .tag {
+  background-color: rgba(31, 155, 255, .15) !important;
+  color: var(--air-blue) !important;
+}
+[component="category/topic"].unread .title, .unread-count { color: var(--air-blue) !important; }
+
+/* Brand bar logo: give it room on the dark background */
+[component="brand/logo"], .forum-logo { max-height: 42px; width: auto; }
+
+/* Graffiti accent for page titles */
+.category-header h1::after, [data-template="categories"] h1::after {
+  content: " ";
+  display: block;
+  width: 64px;
+  height: 4px;
+  margin-top: 6px;
+  background: var(--air-red);
+}
+
+/* Chat */
+[component="chat/messages"], .chats-full .chat-content { background: var(--air-bg) !important; }
+[component="chat/message/body"] { color: var(--air-text); }
+
+/* SSO button on the login page */
+.alt-logins a, [component="sso/login"], .btn-oauth2-airstation {
+  background: var(--air-blue) !important;
+  border-color: var(--air-blue) !important;
+  color: #fff !important;
+}

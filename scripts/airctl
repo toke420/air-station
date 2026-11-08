@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Day-to-day control of AirStation. Run as root on the VPS.
+#
+#   airctl status               containers, stream, now playing, NAS sync
+#   airctl logs [service]       follow logs (liquidsoap, api, icecast, caddy, mediamtx)
+#   airctl skip                 skip the current AutoDJ track
+#   airctl live on|off          allow / block live takeover (off = kick DJ back to AutoDJ)
+#   airctl record off|live|all  recording mode
+#   airctl queue                upcoming AutoDJ tracks
+#   airctl sync [--index]       run the NAS job now (--index = full rescan)
+#   airctl art-check "text"     explain cover art for tracks matching text
+#   airctl art-retry            re-try covers for every cached track without art
+#   airctl art-doctor           check everything cover art depends on (files, web, settings)
+#   airctl live-check           Mixxx/OBS takeover: station state, live log lines, settings
+#   airctl creds                admin login, Mixxx and OBS connection details
+#   airctl check-config         validate radio.liq with Liquidsoap
+#   airctl restart [service]    restart everything or one service
+#   airctl update               pull/build new images, validate, restart
+#   airctl backup               settings, secrets and database -> /root/air-backups
+#   airctl community CMD        forum + sign-on add-on (init, status, finish...)
+#   airctl branding import PACK theme pack (folder or .zip) -> logo, pictures, texts, colours, CSS/JS
+#   airctl branding export [ZIP] current look -> theme pack zip (default /root/airstation-theme-DATE.zip)
+#   airctl geoip update         download/refresh the free DB-IP city database (listener map)
+#   airctl licence [activate KEY | certificate CERT | deactivate | check]   licence status / activation
+set -euo pipefail
+export PATH="/usr/local/sbin:/usr/sbin:/sbin:$PATH"   # root via plain `su` lacks these
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+cd "$ROOT"
+
+cli() { docker compose exec -T api python3 -m airstation.cli "$@"; }
+env_get() { grep -E "^$1=" .env | tail -1 | cut -d= -f2-; }
+
+case "${1:-}" in
+  status)  bash scripts/check.sh ;;
+  logs)    shift; docker compose logs -f --tail=100 "$@" ;;
+  skip)    cli skip ;;
+  live)    cli live "${2:?on|off}" ;;
+  record)  cli record "${2:?off|live|all}" ;;
+  queue)   cli queue ;;
+  sync)
+    if [ "${2:-}" = "--index" ]; then
+      systemd-run --wait --pipe --uid=10001 --gid=10001 -p WorkingDirectory="$ROOT" \
+        -E PYTHONPATH="$ROOT/app" -E AIR_ROOT="$ROOT" /usr/bin/python3 -m airstation.sync --index
+    else
+      systemctl start air-sync.service && journalctl -u air-sync.service -n 20 --no-pager -o cat
+    fi ;;
+  art-check|art-retry)
+    flag="--$1"; shift
+    systemd-run --wait --pipe --quiet --uid=10001 --gid=10001 -p WorkingDirectory="$ROOT" \
+      -E PYTHONPATH="$ROOT/app" -E AIR_ROOT="$ROOT" /usr/bin/python3 -m airstation.sync "$flag" "$@" ;;
+  art-doctor)
+    systemd-run --wait --pipe --quiet --uid=10001 --gid=10001 -p WorkingDirectory="$ROOT" \
+      -E PYTHONPATH="$ROOT/app" -E AIR_ROOT="$ROOT" /usr/bin/python3 -m airstation.sync --art-doctor || true
+    echo
+    echo "Web checks (what browsers get):"
+    domain=$(env_get AIR_DOMAIN)
+    probe() {  # label url
+      code=$(curl -s -o /dev/null -w '%{http_code} %{content_type}' --max-time 10 "https://$domain$2" || echo "failed")
+      case "$code" in 200\ image/*) echo "  ok $1: $2 -> $code" ;; *) echo "  !! $1: $2 -> $code" ;; esac
+    }
+    np=$(curl -s --max-time 5 http://127.0.0.1:8080/api/nowplaying || true)
+    site=$(curl -s --max-time 5 http://127.0.0.1:8080/api/site || true)
+    now_art=$(printf '%s' "$np" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["now"].get("art") or "")' 2>/dev/null || true)
+    def_art=$(printf '%s' "$site" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("default_art") or "")' 2>/dev/null || true)
+    if [ -z "$np" ]; then echo "  !! API not answering on 127.0.0.1:8080 (docker compose ps)"; fi
+    if [ -n "$now_art" ]; then probe "now playing cover" "$now_art"; else echo "  -- now playing: no cover for this track (the default cover is shown)"; fi
+    [ -n "$def_art" ] && probe "default cover" "$def_art"
+    probe "bundled cover" "/assets/img/default-art.png"
+    docker compose exec -T caddy sh -c 'ls /srv/art | wc -l; ls /srv/branding' 2>/dev/null \
+      | { read -r n; echo "  -- Caddy sees $n files in data/art; branding: $(tr '\n' ' ')"; } || echo "  !! could not look inside the caddy container"
+    ;;
+  live-check)
+    echo "What Liquidsoap reports right now:"
+    cli state || echo "  !! Liquidsoap not answering (docker compose ps; airctl logs liquidsoap)"
+    echo
+    echo "Takeover setting: AIR_LIVE_SWITCH=$(env_get AIR_LIVE_SWITCH || true) (track = after the current song, immediate = cut in)"
+    echo
+    echo "Liquidsoap log, last 20 minutes (live-related lines):"
+    docker compose logs --since 20m --no-log-prefix liquidsoap 2>&1 \
+      | grep -iE "harbor|live|obs|dj |source|strip|blank|error|fail" | tail -40 || echo "  (nothing)"
+    echo
+    echo "Mixxx must use: Icecast 2 | Host $(env_get AIR_DOMAIN) | Port 8005 | Mount /live | Login source"
+    echo "  (password: bash scripts/airctl creds)  Encoding MP3 192 kbps, 44100 Hz, stereo"
+    ;;
+  licence|license)
+    shift
+    docker compose exec -T api python3 -m airstation.licensing "${@:-status}" ;;
+  geoip)
+    [ "${2:-}" = "update" ] || { echo "usage: airctl geoip update"; exit 1; }
+    install -d -o 10001 -g 10001 -m 755 data/geoip
+    systemd-run --wait --pipe --quiet --uid=10001 --gid=10001 -p WorkingDirectory="$ROOT" \
+      -E PYTHONPATH="$ROOT/app" -E AIR_ROOT="$ROOT" /usr/bin/python3 -m airstation.geoip update --force
+    echo "The API picks up the new database within a minute." ;;
+  creds)
+    domain=$(env_get AIR_DOMAIN)
+    obs=$(cat secrets/obs_publish_password)
+    echo "Website admin   https://$domain/admin/"
+    echo "  password      $(cat secrets/admin_ui_password)"
+    echo
+    echo "Mixxx (Preferences > Live Broadcasting)"
+    echo "  Type Icecast 2 | Host $domain | Port 8005 | Mount /live | Login source"
+    echo "  Password      $(cat secrets/dj_password)"
+    echo "  Encoding      MP3, 192 kbps, 44100 Hz, stereo"
+    echo
+    echo "OBS (Settings > Stream > Custom)"
+    echo "  SRT  server   srt://$domain:8890?streamid=publish:obs:obs:$obs&pkt_size=1316   (key empty)"
+    echo "  RTMP server   rtmp://$domain    key  obs?user=obs&pass=$obs" ;;
+  check-config)
+    docker compose run --rm --no-deps liquidsoap --check /app/config/radio.liq \
+      && echo "radio.liq OK" ;;
+  restart) shift; docker compose restart "$@" ;;
+  update)
+    docker compose pull caddy liquidsoap mediamtx
+    docker compose build --pull
+    docker compose run --rm --no-deps liquidsoap --check /app/config/radio.liq
+    docker compose up -d
+    sleep 15
+    bash scripts/check.sh ;;
+  backup)  bash scripts/backup.sh ;;
+  community) shift; python3 scripts/community.py "$@" ;;
+  branding)
+    sub="${2:-}"
+    work="data/branding/.pack-$$"
+    trap 'rm -rf "$ROOT/$work"' EXIT
+    case "$sub" in
+      import)
+        src="${3:?usage: airctl branding import FOLDER-or-ZIP}"
+        mkdir -p "$work"
+        if [ -d "$src" ]; then cp -r "$src"/. "$work"/
+        else python3 -c 'import sys,zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' "$src" "$work"; fi
+        pack=$(dirname "$(find "$work" -maxdepth 2 -name theme.json | head -1)")
+        [ -f "$pack/theme.json" ] || { echo "No theme.json in $src"; exit 1; }
+        chown -R 10001:10001 "$work"
+        docker compose exec -T api python3 -m airstation.branding import "/data/branding/${pack#data/branding/}"
+        echo "Done. Reload the site (Ctrl+F5) to see it." ;;
+      export)
+        out="${3:-/root/airstation-theme-$(date +%Y%m%d-%H%M).zip}"
+        mkdir -p "$work" && chown 10001:10001 "$work"
+        docker compose exec -T api python3 -m airstation.branding export "/data/branding/.pack-$$"
+        python3 - "$work" "$out" <<'PY'
+import sys, zipfile
+from pathlib import Path
+src, out = Path(sys.argv[1]), sys.argv[2]
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+    for f in sorted(src.rglob("*")):
+        if f.is_file():
+            z.write(f, f.relative_to(src))
+print("Theme pack written:", out)
+PY
+        ;;
+      *) echo "usage: airctl branding import FOLDER-or-ZIP | export [ZIP]"; exit 1 ;;
+    esac ;;
+  *) sed -n '2,24p' "$0"; exit 1 ;;
+esac

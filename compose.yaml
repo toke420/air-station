@@ -1,0 +1,324 @@
+name: air-station
+
+# Settings come from .env (created by scripts/init.py). Secrets are files in
+# ./secrets, mounted read-only at /run/secrets inside the containers.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardened: &hardened
+  init: true
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging: *logging
+
+# Community services (forum + single sign-on) only start when the
+# "community" profile is enabled: COMPOSE_PROFILES=community in .env
+# (scripts/community.py init sets it). See docs/COMMUNITY-SETUP.md.
+x-community: &community
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+  logging: *logging
+  profiles: [community]
+
+services:
+  caddy:
+    <<: *hardened
+    image: ${AIR_CADDY_IMAGE:-caddy:2}
+    cap_add: [NET_BIND_SERVICE]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      AIR_DOMAIN: ${AIR_DOMAIN:?set AIR_DOMAIN in .env}
+      AIR_ACME_EMAIL: ${AIR_ACME_EMAIL:?set AIR_ACME_EMAIL in .env}
+      AIR_ID_DOMAIN: ${AIR_ID_DOMAIN:-id.example.com}
+      AIR_FORUM_DOMAIN: ${AIR_FORUM_DOMAIN:-forum.example.com}
+    volumes:
+      - ./config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./config/Caddyfile.d:/etc/caddy/Caddyfile.d:ro
+      - ./web:/srv/web:ro
+      - ./data/art:/srv/art:ro
+      - ./data/branding:/srv/branding:ro
+      - hls:/srv/hls:ro
+      - ./data/site:/srv/site:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      default:
+        # Containers that call the public addresses (NodeBB -> id.example.com for
+        # sign-on) reach Caddy directly inside Docker. Going out to the VPS's
+        # public IP and back in is blocked by ufw and times out.
+        aliases:
+          - ${AIR_DOMAIN}
+          - ${AIR_ID_DOMAIN:-id.example.com}
+          - ${AIR_FORUM_DOMAIN:-forum.example.com}
+    depends_on:
+      api:
+        condition: service_healthy
+      icecast:
+        condition: service_healthy
+    mem_limit: 256m
+
+  icecast:
+    <<: *hardened
+    image: air-station:2
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m,mode=1777
+    command: [python3, -m, airstation.icecast_start]
+    environment:
+      TZ: ${AIR_TZ:-UTC}
+      AIR_DOMAIN: ${AIR_DOMAIN}
+    ports:
+      - "127.0.0.1:8000:8000"   # local checks only; the public gets it via Caddy
+    secrets: [source_password, admin_password, relay_password]
+    healthcheck:
+      test: [CMD, curl, -fsS, --max-time, "5", http://127.0.0.1:8000/status-json.xsl]
+      interval: 20s
+      timeout: 6s
+      retries: 3
+    mem_limit: 256m
+
+  api:
+    <<: *hardened
+    image: air-station:2
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m,mode=1777
+    command: [python3, -m, airstation.server]
+    environment:
+      TZ: ${AIR_TZ:-UTC}
+      AIR_TZ: ${AIR_TZ:-UTC}
+      AIR_DOMAIN: ${AIR_DOMAIN}
+      AIR_DATA_DIR: /data
+      AIR_LIQ_HOST: liquidsoap
+      AIR_ICECAST_URL: http://icecast:8000
+      AIR_CACHE_MAX_GB: ${AIR_CACHE_MAX_GB:-12}
+      AIR_DISK_RESERVE_GB: ${AIR_DISK_RESERVE_GB:-10}
+      AIR_OWNCAST_URL: ${AIR_OWNCAST_URL:-}
+      AIR_FORUM_INTERNAL_URL: http://nodebb:4567
+      AIR_FORUM_DOMAIN: ${AIR_FORUM_DOMAIN:-forum.example.com}
+      AIR_ID_DOMAIN: ${AIR_ID_DOMAIN:-id.example.com}
+      AIR_HLS_DIR: /hls
+      AIR_WEB_DIR: /web
+      AIR_SITE_DIR: /data/site
+      AIR_MAP_TILES: ${AIR_MAP_TILES:-}
+      AIR_MAP_ATTRIBUTION: ${AIR_MAP_ATTRIBUTION:-}
+    volumes:
+      - ./data/db:/data/db
+      - ./data/emergency:/data/emergency:ro
+      - ./data/art:/data/art:ro
+      - ./data/branding:/data/branding
+      - ./data/recordings:/data/recordings:ro
+      - ./data/geoip:/data/geoip:ro
+      - hls:/hls:ro
+      - ./web:/web:ro
+      - ./data/site:/data/site
+    ports:
+      - "127.0.0.1:8080:8080"   # local checks only
+    secrets: [admin_ui_password, session_secret, internal_token, dj_password, obs_publish_password, admin_password]
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)"]
+      interval: 20s
+      timeout: 6s
+      retries: 3
+    mem_limit: 256m
+
+  liquidsoap:
+    <<: *hardened
+    image: ${AIR_LIQUIDSOAP_IMAGE:-savonet/liquidsoap:v2.4.5}
+    user: "10001:10001"
+    entrypoint: [liquidsoap]
+    command: [/app/config/radio.liq]
+    environment:
+      TZ: ${AIR_TZ:-UTC}
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/cache
+      AIR_STATION_NAME: ${AIR_STATION_NAME:-AirStation}
+      AIR_STATION_URL: https://${AIR_DOMAIN}
+      AIR_RECORD_MODE: "off"
+      AIR_LIVE_SWITCH: ${AIR_LIVE_SWITCH:-track}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=128m,mode=1777
+    volumes:
+      - ./config/radio.liq:/app/config/radio.liq:ro
+      - ./data/cache:/cache:ro
+      - ./data/emergency:/emergency:ro
+      - ./data/recordings:/recordings
+    ports:
+      - "8005:8005"             # Mixxx connects here (Icecast 2 protocol)
+    secrets: [source_password, dj_password, obs_harbor_password, internal_token]
+    depends_on:
+      icecast:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    mem_limit: 768m
+
+  # HLS copy of the main stream (/radio.m3u8, AAC 128 kbps) for IPTV apps and
+  # playlists. ffmpeg listens to /radio.mp3 like any player and writes 6-second
+  # segments to a memory-only folder that Caddy serves.
+  hls:
+    <<: *hardened
+    image: ${AIR_FFMPEG_IMAGE:-bluenviron/mediamtx:latest-ffmpeg}
+    entrypoint: [ffmpeg]
+    command:
+      - -nostdin
+      - -hide_banner
+      - -loglevel
+      - warning
+      - -user_agent
+      - AirStation-HLS
+      - -reconnect
+      - "1"
+      - -reconnect_streamed
+      - "1"
+      - -reconnect_delay_max
+      - "5"
+      - -rw_timeout
+      - "15000000"
+      - -i
+      - http://icecast:8000/radio.mp3
+      - -vn
+      - -c:a
+      - aac
+      - -b:a
+      - ${AIR_HLS_BITRATE:-128k}
+      - -ar
+      - "44100"
+      - -ac
+      - "2"
+      - -f
+      - hls
+      - -hls_time
+      - "6"
+      - -hls_list_size
+      - "8"
+      - -hls_delete_threshold
+      - "4"
+      - -hls_start_number_source
+      - epoch
+      - -hls_flags
+      - delete_segments+independent_segments+omit_endlist+temp_file
+      - -hls_segment_filename
+      - /hls/radio_%d.ts
+      - /hls/radio.m3u8
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - hls:/hls
+    depends_on:
+      icecast:
+        condition: service_healthy
+    mem_limit: 128m
+
+  mediamtx:
+    <<: *hardened
+    image: ${AIR_MEDIAMTX_IMAGE:-bluenviron/mediamtx:latest-ffmpeg}
+    user: "10001:10001"
+    volumes:
+      - ./data/generated/mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - "8890:8890/udp"         # OBS over SRT (recommended)
+      - "1935:1935"             # OBS over RTMP
+    depends_on: [liquidsoap]
+    mem_limit: 512m
+
+  # ------------------------------------------------------------ community
+  postgres:
+    <<: *community
+    image: ${AIR_POSTGRES_IMAGE:-postgres:17-alpine}
+    environment:
+      POSTGRES_USER: nodebb
+      POSTGRES_DB: nodebb
+      POSTGRES_PASSWORD_FILE: /run/secrets/forum_db_password
+    secrets: [forum_db_password]
+    volumes:
+      - forum_db:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U nodebb -d nodebb"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    mem_limit: 384m
+
+  rauthy:
+    <<: *community
+    image: ${AIR_RAUTHY_IMAGE:-ghcr.io/sebadob/rauthy:0.37.0}
+    user: "10001:10001"
+    environment:
+      # Rauthy's "small instance" memory profile (docs: Tuning > Memory allocator)
+      MALLOC_CONF: "abort_conf:true,narenas:1,tcache_max:1024,dirty_decay_ms:1000,muzzy_decay_ms:1000"
+    volumes:
+      - ./data/community/rauthy/config.toml:/app/config.toml:ro
+      - ./data/community/rauthy/data:/app/data
+    # Password hashing needs max_hash_threads x argon2_m_cost (64 MB, see
+    # config/community/rauthy.toml.template) on top of ~100 MB idle.
+    mem_limit: 512m
+
+  nodebb:
+    <<: *community
+    image: ${AIR_NODEBB_IMAGE:-ghcr.io/nodebb/nodebb:latest}
+    environment:
+      NODEBB_ADDITIONAL_PLUGINS: nodebb-plugin-sso-oauth2-multiple
+    ports:
+      - "127.0.0.1:4567:4567"   # first-time web installer via SSH tunnel only
+    volumes:
+      - forum_config:/opt/config
+      - forum_build:/usr/src/app/build
+      - forum_uploads:/usr/src/app/public/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1536m
+
+secrets:
+  source_password:
+    file: ./secrets/source_password
+  admin_password:
+    file: ./secrets/admin_password
+  relay_password:
+    file: ./secrets/relay_password
+  dj_password:
+    file: ./secrets/dj_password
+  obs_harbor_password:
+    file: ./secrets/obs_harbor_password
+  obs_publish_password:
+    file: ./secrets/obs_publish_password
+  internal_token:
+    file: ./secrets/internal_token
+  admin_ui_password:
+    file: ./secrets/admin_ui_password
+  session_secret:
+    file: ./secrets/session_secret
+  forum_db_password:
+    file: ./secrets/forum_db_password
+
+volumes:
+  hls:                          # HLS segments live in memory only (a few MB)
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=32m,uid=10001,gid=10001,mode=0755"
+  caddy_data:
+  caddy_config:
+  forum_db:
+  forum_config:
+  forum_build:
+  forum_uploads:

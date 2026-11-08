@@ -1,0 +1,56 @@
+# Rauthy (single sign-on) for AirStation.
+# Rendered by scripts/community.py into data/community/rauthy/config.toml
+# (values filled in, quoted and escaped). Edit this template, then rerun:
+#   python3 scripts/community.py render && docker compose up -d --force-recreate rauthy
+
+[server]
+# Public host name (no https://). Caddy terminates HTTPS in front of Rauthy.
+pub_url = @@ID_DOMAIN@@
+listen_address = '0.0.0.0'
+port_http = 8080
+scheme = 'http'
+proxy_mode = true
+# Caddy reaches Rauthy over the Docker network.
+trusted_proxies = ['172.16.0.0/12', '192.168.0.0/16', '10.0.0.0/8']
+
+[cluster]
+node_id = 1
+nodes = ["1 localhost:8100 localhost:8200"]
+secret_raft = @@SECRET_RAFT@@
+secret_api = @@SECRET_API@@
+
+[encryption]
+keys = [@@ENC_KEY_ENTRY@@]
+key_active = @@ENC_KEY_ID@@
+
+[hashing]
+# Argon2id password hashing sized for this 4 GB VPS: 64 MB per login, one at a
+# time (Rauthy's defaults are 128 MB x 2, too much for its 512 MB limit).
+argon2_m_cost = 65536
+argon2_t_cost = 3
+argon2_p_cost = 2
+max_hash_threads = 1
+
+[bootstrap]
+# The first Rauthy admin. Its random password is printed once in the log:
+#   bash scripts/community.py admin-password
+admin_email = @@ADMIN_EMAIL@@
+
+[user_registration]
+# Anyone can create an AirStation account (email verification required).
+enable = true
+
+[webauthn]
+rp_id = @@ID_DOMAIN@@
+rp_origin = @@RP_ORIGIN@@
+rp_name = @@RP_NAME@@
+
+[email]
+rauthy_admin_email = @@ADMIN_EMAIL@@
+smtp_url = @@SMTP_HOST@@
+smtp_port = @@SMTP_PORT@@
+smtp_username = @@SMTP_USERNAME@@
+smtp_password = @@SMTP_PASSWORD@@
+smtp_from = @@SMTP_FROM@@
+# 'starttls' for port 587, 'tls' for port 465
+smtp_tls_mode = @@SMTP_TLS_MODE@@
