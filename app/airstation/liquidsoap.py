@@ -61,6 +61,11 @@ def state(**kwargs):
         data[key] = str(data.get(key) or "")
     data.setdefault("meta", {})
     data["meta"] = _metadata_dict(data.get("meta"))
-    for key in ("live_connected", "obs_connected", "live_enabled", "live_waiting"):
+    for key in ("live_connected", "obs_connected", "live_enabled", "live_waiting",
+                "mic_connected", "pause", "music_stopped"):
         data[key] = bool(data.get(key))
+    try:
+        data["music_volume"] = max(0, min(100, int(data.get("music_volume", 100))))
+    except (TypeError, ValueError):
+        data["music_volume"] = 100
     return data

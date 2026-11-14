@@ -22,6 +22,20 @@ If a release changes the systemd units, its notes say so and include the
 If `check-config` prints an error, nothing is restarted. Contact support (SUPPORT.md) with
 the full output.
 
+## Upgrading to 2.8.0 (studio desk)
+
+`radio.liq` and the Caddyfile changed, so validate first and restart Caddy too:
+
+```bash
+bash scripts/airctl check-config        # must print: radio.liq OK
+docker compose up -d && docker compose restart caddy && sleep 20 && bash scripts/check.sh
+```
+
+Then open Studio > Dashboard > **Studio desk** (reload the page once), press *Connect
+microphone* and allow the microphone in the browser. If `check-config` prints an error,
+don't restart: put the previous file back (`cp /root/radio.liq.prev config/radio.liq`)
+and contact support with the output. The desk's buttons need the new `radio.liq`.
+
 ## Upgrading to 2.7.0 (search-friendly title and pages)
 
 The API and Caddy get new folders (`data/site`, `web` for the API), so run `init.py` and

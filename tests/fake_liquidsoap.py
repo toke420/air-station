@@ -16,7 +16,9 @@ class FakeLiquidsoap:
         self.state = {"source": "autodj", "title": "", "artist": "", "album": "",
                       "air_id": "", "live_connected": False, "obs_connected": False,
                       "live_enabled": True, "live_waiting": False, "live_switch": "track",
-                      "record": "off", "meta": []}
+                      "record": "off", "mic_connected": False, "music_volume": 100,
+                      "pause": False, "music_stopped": False, "meta": []}
+        self.mic_token = ""
         self.commands = []
         fake = self
 
@@ -47,6 +49,16 @@ class FakeLiquidsoap:
             return "OK"
         if cmd == "air.record":
             self.state["record"] = arg
+            return "OK"
+        if cmd == "air.volume":
+            self.state["music_volume"] = int(arg)
+            return "OK"
+        if cmd == "air.pause":
+            self.state["pause"] = arg == "on"
+            self.state["music_stopped"] = False if arg != "on" else self.state["music_stopped"]
+            return "OK"
+        if cmd == "air.mic_token":
+            self.mic_token = arg
             return "OK"
         return "ERROR: unknown command"
 

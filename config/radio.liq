@@ -7,6 +7,13 @@
 #   4. Emergency folder   data/emergency, used when the API has nothing to give
 #   5. Silence            last resort so listeners stay connected
 #
+# Studio desk (admin dashboard, see "studio desk" below):
+#   - the browser microphone arrives on harbor mount /mic (WebSocket, through
+#     Caddy) and is mixed on top of whatever is on air (voice-over);
+#   - air.volume sets the level of the music under the voice;
+#   - air.pause stops AutoDJ when the current song ends (talk break) until
+#     it is switched off again.
+#
 # Live takeover timing (AIR_LIVE_SWITCH in .env):
 #   track      (default) a DJ who connects goes on air when the current AutoDJ
 #              song ends. "Go live now" in the admin cuts in straight away.
@@ -89,14 +96,52 @@ wait_for_song = live_switch != "immediate"
 # same simple setup as v2.0; the waiting is done by opening this gate.
 live_open = ref(false)
 
+# ------------------------------------------------------------ studio desk
+# Talk break: with pause_wanted set, AutoDJ finishes the current song and then
+# stays quiet (the switch only looks at its condition between songs).
+pause_wanted = ref(false)
+music = switch(id="music", track_sensitive=true, [({not pause_wanted()}, autodj)])
+
+def music_stopped() =
+  pause_wanted() and not music.is_ready()
+end
+
+# Music level under the microphone: 0.0 to 1.0, moved in small steps so a
+# change in the admin is a short fade instead of a jump.
+music_target = ref(1.)
+music_gain = ref(1.)
+def glide_music() =
+  diff = music_target() - music_gain()
+  if diff > 0.04 then
+    music_gain := music_gain() + 0.04
+  elsif diff < -0.04 then
+    music_gain := music_gain() - 0.04
+  else
+    music_gain := music_target()
+  end
+end
+thread.run(every=0.05, glide_music)
+
+# Browser microphone. No fixed password: the API hands the logged-in admin a
+# one-time token and tells this script about it (air.mic_token); nothing
+# connects before that.
+mic_token = ref("")
+def mic_auth(login) =
+  mic_token() != "" and login.password == mic_token()
+end
+mic_raw = input.harbor(id="mic_in", port=8005, auth=mic_auth,
+                       buffer=1., max=4., "mic")
+
 live_gated = switch(id="live_gate", track_sensitive=false,
                     [({live_allowed() and live_open()}, live_audible)])
 obs_gated = switch(id="obs_gate", track_sensitive=false,
                    [({live_allowed() and live_open()}, obs_audible)])
 
 programme = fallback(id="programme", track_sensitive=false,
-                     [live_gated, obs_gated, autodj])
-radio = mksafe(programme)
+                     [live_gated, obs_gated, music])
+# Everything on air at the chosen level, with the microphone on top at full level.
+bed = amplify(id="music_level", {music_gain()}, mksafe(programme))
+radio = add(id="air_mix", normalize=false, [bed, mic_raw])
 
 def dj_connected() =
   live_raw.is_ready() or obs_raw.is_ready()
@@ -114,7 +159,7 @@ def watch_live() =
     live_open := false
     waiting_from := ""
   elsif (not live_open()) and live_allowed() then
-    if not wait_for_song then
+    if (not wait_for_song) or music_stopped() then
       live_open := true
     else
       song = song_key()
@@ -190,7 +235,11 @@ def air_state(_) =
     live_enabled = live_allowed(),
     live_waiting = dj_connected() and live_allowed() and src == "autodj",
     live_switch = live_switch,
-    record = record_mode()
+    record = record_mode(),
+    mic_connected = mic_raw.is_ready(),
+    music_volume = int_of_float(music_target() * 100. + 0.5),
+    pause = pause_wanted(),
+    music_stopped = music_stopped() and src == "autodj"
   })
 end
 
@@ -220,7 +269,30 @@ def air_record(arg) =
   end
 end
 
+def air_volume(arg) =
+  level = float_of_string(default=-1., string.trim(arg))
+  if level < 0. or level > 100. then
+    "usage: air.volume 0-100"
+  else
+    music_target := level / 100.
+    "music volume #{int_of_float(level)}"
+  end
+end
+
+def air_pause(arg) =
+  pause_wanted := (string.trim(arg) == "on")
+  if pause_wanted() then "music stops after this song" else "music on" end
+end
+
+def air_mic_token(arg) =
+  mic_token := string.trim(arg)
+  "OK"
+end
+
 server.register(namespace="air", description="Station state as JSON", "state", air_state)
 server.register(namespace="air", description="Skip the current AutoDJ track", "skip", air_skip)
 server.register(namespace="air", usage="live on|off", description="Allow live takeover", "live", air_live)
 server.register(namespace="air", usage="record off|live|all", description="Recording mode", "record", air_record)
+server.register(namespace="air", usage="volume 0-100", description="Music level under the microphone", "volume", air_volume)
+server.register(namespace="air", usage="pause on|off", description="Stop AutoDJ after the current song (talk break)", "pause", air_pause)
+server.register(namespace="air", usage="mic_token <token>", description="Token the browser microphone must present", "mic_token", air_mic_token)

@@ -239,3 +239,15 @@ dl.kpi { margin: 0; }
 .pill.warn { background: rgba(245,165,36,.12); color: var(--amber); }
 .l-offline { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
 .l-offline summary { cursor: pointer; color: var(--muted); }
+
+/* Studio desk (dashboard) */
+.desk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 32px; }
+.desk-grid h3 { margin-top: 0; }
+.desk input[type=range] { width: 100%; padding: 0; accent-color: var(--blue); }
+.desk output { color: var(--text); font-weight: 600; margin-left: 6px; }
+.desk .meter.vu { margin: 10px 0 4px; }
+.desk .meter.vu i { width: 0; background: var(--green); transition: width .08s linear; }
+.desk .meter.vu i.hot { background: var(--red); }
+.mic-btn.on { background: var(--red); border-color: var(--red); color: #fff; }
+.desk [data-k-pause].on { background: var(--amber); border-color: var(--amber); color: #111; }
+@media (max-width: 680px) { .desk-grid { grid-template-columns: 1fr; } }

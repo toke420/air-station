@@ -168,6 +168,7 @@
     const waiting = $("[data-d-waiting]");
     waiting.hidden = !(liq && liq.live_waiting);
     $("[data-skip]").textContent = liq && liq.live_waiting ? "Go live now" : "Skip track";
+    renderDesk(liq);
     const lib = d.library, sync = d.sync || {};
     const stats = [["Library", lib.total], ["Cached", lib.cached], ["Missing", lib.missing],
       ["Unplayable", lib.bad], ["Emergency files", d.emergency ? d.emergency.files : "?"], ["Disk free", d.disk.free ? gb(d.disk.free) : "?"]];
@@ -207,6 +208,151 @@
   }));
   $("[data-record]").addEventListener("change", guard(async e => { await api("/record", "POST", { mode: e.target.value }); toast("Recording mode: " + e.target.value); }));
   $("[data-rescan]").addEventListener("click", guard(async () => { const r = await api("/sync", "POST", {}); toast(r.message); }));
+
+  /* ------------------------------------------------------ studio desk */
+  // Microphone: browser -> WebSocket ("webcast" protocol) -> Caddy -> Liquidsoap /mic,
+  // mixed on top of the programme. The mic button only opens and closes the gain here,
+  // so what you say is never cut off by the few seconds the audio takes to reach air.
+  const K = { liq: null, volTouched: 0, volTimer: null, mic: null, onAir: false };
+  const MIC_TYPES = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/webm", "audio/mp4"];
+
+  function renderDesk(liq) {
+    K.liq = liq || null;
+    const vol = $("[data-k-vol]"), pause = $("[data-k-pause]");
+    vol.disabled = pause.disabled = !liq;
+    $$("[data-k-preset]").forEach(b => b.disabled = !liq);
+    if (liq && Date.now() - K.volTouched > 3000) {
+      vol.value = liq.music_volume;
+      $("[data-k-vol-out]").textContent = liq.music_volume + "%";
+    }
+    const paused = !!(liq && liq.pause);
+    pause.classList.toggle("on", paused);
+    pause.setAttribute("aria-pressed", String(paused));
+    pause.textContent = paused ? "Resume music" : "Pause music after this track";
+    const hint = $("[data-k-pause-hint]");
+    hint.className = "hint" + (paused ? " warn" : "");
+    hint.textContent = !paused ? "For a talk break: the current track plays to the end, then nothing plays until you resume."
+      : liq.music_stopped ? "Music is paused: only the microphone is on air. Listeners hear silence while the mic is off."
+      : liq.source !== "autodj" ? "A live source is on air. AutoDJ stays paused when it ends, until you resume."
+      : "The music stops when this track ends.";
+    const pill = $("[data-k-state]"), air = $("[data-k-air]");
+    const reached = !!(liq && liq.mic_connected);
+    pill.textContent = !K.mic ? (reached ? "mic connected elsewhere" : "mic off") : K.onAir ? "mic on air" : reached ? "mic ready" : "mic connecting";
+    pill.className = "pill" + (K.mic && K.onAir ? " live" : K.mic && reached ? " ok" : reached ? " warn" : " dim");
+    $("[data-k-connect]").textContent = K.mic ? "Disconnect microphone" : "Connect microphone";
+    air.disabled = !K.mic;
+    air.classList.toggle("on", K.onAir);
+    air.setAttribute("aria-pressed", String(K.onAir));
+    air.textContent = K.onAir ? "Mic is ON AIR" : "Mic is off";
+  }
+
+  async function desk(path, body) {
+    const r = await api(path, "POST", body);
+    renderDesk(r.liquidsoap);
+    return r;
+  }
+
+  function setVolume(value, now = false) {
+    K.volTouched = Date.now();
+    $("[data-k-vol]").value = value;
+    $("[data-k-vol-out]").textContent = value + "%";
+    clearTimeout(K.volTimer);
+    K.volTimer = setTimeout(guard(() => desk("/volume", { volume: +value })), now ? 0 : 150);
+  }
+  $("[data-k-vol]").addEventListener("input", e => setVolume(e.target.value));
+  $$("[data-k-preset]").forEach(b => b.addEventListener("click", () => setVolume(b.dataset.kPreset, true)));
+  $("[data-k-pause]").addEventListener("click", guard(async () => {
+    const r = await desk("/pause", { paused: !(K.liq && K.liq.pause) });
+    toast(r.liquidsoap && r.liquidsoap.pause ? "Music stops after this track." : "Music resumed.");
+  }));
+
+  function micLevel() { return $("[data-k-gain]").value / 100; }
+  function micAir(on) {
+    const m = K.mic;
+    K.onAir = !!(on && m);
+    if (m) m.gain.gain.setTargetAtTime(K.onAir ? micLevel() : 0, m.ctx.currentTime, 0.03);
+    renderDesk(K.liq);
+  }
+  function micClose(message) {
+    const m = K.mic;
+    if (!m) return;
+    K.mic = null; K.onAir = false;
+    cancelAnimationFrame(m.raf);
+    try { if (m.rec && m.rec.state !== "inactive") m.rec.stop(); } catch { /* */ }
+    m.stream.getTracks().forEach(t => t.stop());
+    try { m.ws.onclose = null; m.ws.close(); } catch { /* */ }
+    m.ctx.close().catch(() => {});
+    $("[data-k-vu]").style.width = "0";
+    renderDesk(K.liq);
+    if (message) toast(message, true);
+  }
+  async function micOpen() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder)
+      throw new Error("This browser can't send microphone audio. Use a current Chrome, Edge, Firefox or Safari over https.");
+    const mime = MIC_TYPES.find(t => MediaRecorder.isTypeSupported(t));
+    if (!mime) throw new Error("This browser has no audio format the station accepts.");
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } });
+    } catch (e) {
+      throw new Error(e.name === "NotAllowedError" ? "Microphone access was blocked. Allow it for this site in the browser's address bar."
+        : e.name === "NotFoundError" ? "No microphone found." : "Microphone: " + e.message);
+    }
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(stream), gain = ctx.createGain(), analyser = ctx.createAnalyser(), out = ctx.createMediaStreamDestination();
+    gain.gain.value = 0;                                    // connected but muted until the mic button
+    analyser.fftSize = 1024;
+    src.connect(analyser); src.connect(gain); gain.connect(out);
+    const m = K.mic = { stream, ctx, gain, analyser, ws: null, rec: null, raf: 0 };
+    try {
+      await ctx.resume();
+      const t = await api("/mic", "POST", {});
+      const ws = m.ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + t.socket, "webcast");
+      await new Promise((ok, fail) => {
+        const timer = setTimeout(() => fail(new Error("The station didn't answer the microphone connection.")), 8000);
+        ws.onopen = () => { clearTimeout(timer); ok(); };
+        ws.onerror = ws.onclose = () => { clearTimeout(timer); fail(new Error("The station refused the microphone connection.")); };
+      });
+      if (K.mic !== m) return;
+      ws.onerror = null;
+      ws.onclose = () => { if (K.mic === m) micClose("Microphone disconnected."); };
+      ws.send(JSON.stringify({ type: "hello", data: { mime, user: t.login, password: t.token } }));
+      const rec = m.rec = new MediaRecorder(out.stream, { mimeType: mime, audioBitsPerSecond: 128000 });
+      rec.ondataavailable = e => { if (e.data && e.data.size && ws.readyState === 1) ws.send(e.data); };
+      rec.start(100);
+    } catch (e) {
+      if (K.mic === m) micClose();
+      throw e;
+    }
+    const buf = new Float32Array(analyser.fftSize), vu = $("[data-k-vu]");
+    (function meter() {
+      if (K.mic !== m) return;
+      analyser.getFloatTimeDomainData(buf);
+      let peak = 0;
+      for (const v of buf) peak = Math.max(peak, Math.abs(v));
+      peak *= micLevel();
+      const db = peak > 0 ? 20 * Math.log10(peak) : -60;     // -60 dB .. 0 dB across the bar
+      vu.style.width = Math.max(0, Math.min(100, (db + 60) / 60 * 100)) + "%";
+      vu.classList.toggle("hot", db > -3);
+      m.raf = requestAnimationFrame(meter);
+    })();
+    renderDesk(K.liq);
+    toast("Microphone connected. Press the mic button to go on air.");
+    setTimeout(() => { if (K.mic === m && S.view === "dashboard") loadDashboard(); }, 2500);
+  }
+  let micBusy = false;
+  $("[data-k-connect]").addEventListener("click", guard(async () => {
+    if (micBusy) return;
+    if (K.mic) return micClose();
+    micBusy = true;
+    try { await micOpen(); } finally { micBusy = false; }
+  }));
+  $("[data-k-air]").addEventListener("click", () => micAir(!K.onAir));
+  $("[data-k-gain]").addEventListener("input", e => {
+    $("[data-k-gain-out]").textContent = e.target.value + "%";
+    if (K.mic && K.onAir) K.mic.gain.gain.setTargetAtTime(micLevel(), K.mic.ctx.currentTime, 0.03);
+  });
+  window.addEventListener("beforeunload", e => { if (K.onAir) { e.preventDefault(); e.returnValue = ""; } });
 
   /* ---------------------------------------------------------- library */
   async function ensurePlaylists() {

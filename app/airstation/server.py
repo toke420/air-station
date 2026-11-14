@@ -26,6 +26,7 @@ SESSION_COOKIE = "air_admin"
 SESSION_SECONDS = 12 * 3600
 MAX_BODY = 256 * 1024
 RECORD_MODES = ("off", "live", "all")
+MIC_SOCKET = "/api/admin/mic/socket"     # Caddy passes this WebSocket to Liquidsoap
 
 
 def log(message):
@@ -181,6 +182,8 @@ class Station:
         artist, title = state.get("artist", ""), state.get("title", "")
         if source == "autodj" and (air_id.startswith("em-") or (not air_id and (artist or title))):
             source = "emergency"
+        if source == "autodj" and state.get("music_stopped"):
+            return                      # talk break: the last song has ended, nothing new plays
         identity = (source, air_id, artist, title)
         if identity == self.identity:
             return
@@ -236,6 +239,9 @@ class Station:
                                art=art_url(row["id"]))
             elif air_id.startswith("em-"):
                 now["art"] = self.art_for(conn, air_id)
+            if state.get("music_stopped") and source not in ("live", "obs"):
+                now = {"artist": "", "title": "Talk break", "album": "", "art": None,
+                       "duration": None}
         recent = []
         for row in conn.execute("SELECT * FROM history ORDER BY id DESC LIMIT 11"):
             stored = re.match(r"/art/([\w-]+)\.jpg", row["art"] or "")
@@ -638,6 +644,40 @@ def admin_skip(h, st):
         return {"ok": True, "reply": liquidsoap.command("air.skip")}
     except liquidsoap.LiquidsoapError as error:
         raise ApiError(502, str(error))
+
+
+def _desk(st, command):
+    """Send a studio desk command and reply with Liquidsoap's fresh state."""
+    try:
+        liquidsoap.command(command)
+    except liquidsoap.LiquidsoapError as error:
+        raise ApiError(502, str(error))
+    st.poll_liquidsoap()
+    return {"ok": True, "liquidsoap": st.liq if st.liq_ok else None}
+
+
+@route("POST", "/api/admin/volume", admin=True)
+def admin_volume(h, st):
+    """Level of the music under the microphone, 0 to 100."""
+    value = h.json_body().get("volume")
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 100:
+        raise ApiError(400, "volume must be a number from 0 to 100")
+    return _desk(st, f"air.volume {int(round(value))}")
+
+
+@route("POST", "/api/admin/pause", admin=True)
+def admin_pause(h, st):
+    """Talk break: AutoDJ stops when the current song ends, until switched off."""
+    return _desk(st, f"air.pause {'on' if h.json_body().get('paused') else 'off'}")
+
+
+@route("POST", "/api/admin/mic", admin=True)
+def admin_mic(h, st):
+    """One-time token for the browser microphone (harbor mount /mic, reached through
+    Caddy at MIC_SOCKET). Each call replaces the previous token."""
+    token = secrets.token_hex(24)
+    reply = _desk(st, f"air.mic_token {token}")
+    return dict(reply, token=token, socket=MIC_SOCKET, login="source")
 
 
 @route("POST", "/api/admin/live", admin=True)

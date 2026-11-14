@@ -31,6 +31,14 @@
 		file_server
 	}
 
+	# Studio microphone (admin dashboard): the browser's WebSocket goes to Liquidsoap's
+	# /mic input. Liquidsoap only accepts it with the one-time token the API gives a
+	# logged-in admin.
+	handle /api/admin/mic/socket {
+		rewrite * /mic
+		reverse_proxy liquidsoap:8005
+	}
+
 	handle /api/* {
 		reverse_proxy api:8080
 	}
@@ -97,9 +105,14 @@
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		X-Frame-Options "SAMEORIGIN"
-		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		-Server
 	}
+
+	# The admin's studio desk is the only page allowed to ask for the microphone.
+	@studio path /admin /admin/*
+	header @studio Permissions-Policy "camera=(), microphone=(self), geolocation=()"
+	@notstudio not path /admin /admin/*
+	header @notstudio Permissions-Policy "camera=(), microphone=(), geolocation=()"
 
 	log {
 		output stdout

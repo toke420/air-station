@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.8.0 (14 Nov 2026): studio desk (microphone, music volume, talk breaks)
+
+- **Studio > Dashboard > Studio desk.** Talk on air from the browser, no Mixxx needed:
+  - **Microphone:** *Connect microphone*, then the mic button puts your voice on top of
+    whatever is playing. Level slider and input meter. The audio goes from the browser
+    over a WebSocket (through Caddy) to a new Liquidsoap input, `/mic`.
+  - **Music volume:** slider plus *Full / Voice-over (25%) / Silent* buttons for the
+    programme under your voice. Changes are a short fade.
+  - **Pause music after this track:** the current song plays to the end, then AutoDJ
+    stays quiet for a talk break until you press *Resume music*. The site shows
+    "Talk break" meanwhile. A DJ who connects during a talk break goes on air at once.
+- The microphone input has no fixed password: a logged-in admin gets a one-time token
+  per connection. Only `/admin` may ask the browser for the microphone.
+- Music volume and pause go back to 100% / off when Liquidsoap restarts.
+- New telnet commands: `air.volume`, `air.pause`, `air.mic_token`. `config/radio.liq`
+  changed (run `airctl check-config`); `radio-safe.liq` has no studio desk.
+
 ## 2.7.0 (6 Nov 2026): search-friendly pages
 
 - **Fixed page title.** The browser tab no longer changes to the playing song; it always

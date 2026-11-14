@@ -50,6 +50,23 @@ your first track shortly before the AutoDJ song ends. With `AIR_LIVE_SWITCH=imme
 the station cuts to you as soon as you send audio. Apply a change with
 `docker compose up -d liquidsoap`.
 
+## Talking on air from the browser (studio desk)
+
+Studio > Dashboard > **Studio desk** is a small mixing desk for voice-overs and talk
+breaks, without Mixxx:
+
+- **Connect microphone** asks the browser for the microphone and connects it to the
+  station, muted. The mic button then switches you on and off air. Your voice is mixed
+  on top of whatever is playing (AutoDJ or a live DJ).
+- **Music volume** sets how loud the programme is under your voice. Put it back to
+  *Full* when you're done; it stays where you leave it.
+- **Pause music after this track** lets the current song finish and then keeps AutoDJ
+  quiet until you press **Resume music**. With the mic off, listeners hear silence.
+- Listeners hear you a few seconds late (longer on HLS). Wear headphones and don't
+  monitor the stream while you talk.
+- Closing or reloading the page disconnects the microphone. Volume and pause reset to
+  100% / off when Liquidsoap restarts.
+
 ## Home outages
 
 Nothing to do. The dashboard shows *NAS unreachable* and the sync job (every 5 min)

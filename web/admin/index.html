@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex">
   <title>Studio | AirStation</title>
   <link rel="icon" type="image/png" href="/api/brand/icon">
-  <link rel="stylesheet" href="/admin/admin.css?v=2.7.0">
+  <link rel="stylesheet" href="/admin/admin.css?v=2.8.0">
 </head>
 <body>
 <header class="bar">
@@ -67,6 +67,38 @@
         <p class="hint bad" data-d-emergency hidden></p>
         <p data-d-sync class="hint"></p>
         <button class="btn" data-rescan>Rescan NAS now</button>
+      </div>
+    </div>
+    <div class="panel desk">
+      <h2>Studio desk <span class="pill dim" data-k-state>mic off</span></h2>
+      <div class="desk-grid">
+        <div>
+          <h3>Microphone</h3>
+          <div class="row">
+            <button class="btn" data-k-connect>Connect microphone</button>
+            <button class="btn mic-btn" data-k-air disabled aria-pressed="false">Mic is off</button>
+          </div>
+          <label><span>Mic level <output data-k-gain-out>100%</output></span>
+            <input type="range" min="0" max="200" step="5" value="100" data-k-gain>
+          </label>
+          <div class="meter vu" title="Microphone input level"><i data-k-vu></i></div>
+          <p class="hint" data-k-hint>Connect, then press the mic button to talk over the programme. Wear headphones, and expect listeners to hear you a few seconds later.</p>
+        </div>
+        <div>
+          <h3>Music</h3>
+          <label><span>Music volume <output data-k-vol-out>100%</output></span>
+            <input type="range" min="0" max="100" step="1" value="100" data-k-vol>
+          </label>
+          <div class="row">
+            <button class="btn small" data-k-preset="100">Full</button>
+            <button class="btn small" data-k-preset="25">Voice-over (25%)</button>
+            <button class="btn small" data-k-preset="0">Silent</button>
+          </div>
+          <div class="row">
+            <button class="btn" data-k-pause aria-pressed="false">Pause music after this track</button>
+          </div>
+          <p class="hint" data-k-pause-hint>For a talk break: the current track plays to the end, then nothing plays until you resume.</p>
+        </div>
       </div>
     </div>
     <div class="grid2">
@@ -452,7 +484,7 @@
   </section>
 </main>
 <div class="toast" data-toast></div>
-<script src="/admin/worldmap.js?v=2.7.0" defer></script>
-<script src="/admin/admin.js?v=2.7.0" defer></script>
+<script src="/admin/worldmap.js?v=2.8.0" defer></script>
+<script src="/admin/admin.js?v=2.8.0" defer></script>
 </body>
 </html>

@@ -892,6 +892,43 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("air.skip", self.fake.commands)
 
+    def test_studio_desk_volume_pause_and_mic_token(self):
+        cookie = self.login()
+        h = {"X-Requested-With": "air-admin"}
+        self.assertEqual(self.call("/api/admin/volume", "POST", {"volume": 30})[0], 401)
+        for bad in (-1, 101, "loud", True, None):
+            self.assertEqual(self.call("/api/admin/volume", "POST", {"volume": bad}, h, cookie)[0], 400)
+        status, raw, _ = self.call("/api/admin/volume", "POST", {"volume": 30.4}, h, cookie)
+        self.assertEqual(status, 200)
+        self.assertIn("air.volume 30", self.fake.commands)
+        self.assertEqual(json.loads(raw)["liquidsoap"]["music_volume"], 30)
+
+        status, raw, _ = self.call("/api/admin/pause", "POST", {"paused": True}, h, cookie)
+        self.assertTrue(json.loads(raw)["liquidsoap"]["pause"])
+        # The song still plays until it ends; then the public page shows a talk break
+        # and nothing new goes into the history.
+        self.fake.advance()
+        self.station.poll_liquidsoap()
+        playing = self.station.nowplaying["now"]["title"]
+        self.assertNotEqual(playing, "Talk break")
+        self.fake.state["music_stopped"] = True
+        self.station.poll_liquidsoap()
+        self.assertEqual(self.station.nowplaying["now"]["title"], "Talk break")
+        self.assertEqual(self.station.nowplaying["recent"][0]["title"], playing)
+        status, raw, _ = self.call("/api/admin/pause", "POST", {"paused": False}, h, cookie)
+        self.assertFalse(json.loads(raw)["liquidsoap"]["pause"])
+        self.assertEqual(self.station.nowplaying["now"]["title"], playing)
+
+        self.assertEqual(self.call("/api/admin/mic", "POST", {})[0], 401)
+        first = json.loads(self.call("/api/admin/mic", "POST", {}, h, cookie)[1])
+        self.assertEqual(first["socket"], "/api/admin/mic/socket")
+        self.assertEqual(len(first["token"]), 48)
+        self.assertEqual(self.fake.mic_token, first["token"])
+        second = json.loads(self.call("/api/admin/mic", "POST", {}, h, cookie)[1])
+        self.assertNotEqual(second["token"], first["token"])
+        self.assertEqual(self.fake.mic_token, second["token"])
+        self.call("/api/admin/volume", "POST", {"volume": 100}, h, cookie)
+
     def test_playlist_show_settings_roundtrip(self):
         cookie = self.login()
         h = {"X-Requested-With": "air-admin"}
