@@ -12,6 +12,7 @@ import os
 import re
 import secrets
 import shutil
+import sqlite3
 import threading
 import time
 import traceback
@@ -74,7 +75,27 @@ class Station:
                 target()
             except Exception:  # keep the loop alive; log the cause
                 log(f"{target.__name__} failed:\n{traceback.format_exc()}")
+                self._reset_conn()
             time.sleep(interval)
+
+    def _reset_conn(self):
+        """End this thread's open transaction after a failure.
+
+        sqlite3 opens a transaction before a write and keeps it open if the write
+        fails. In WAL mode that pins an old snapshot: once another writer (air-sync,
+        a request) commits, every later write on this connection fails at once with
+        'database is locked', and the thread never records anything again."""
+        conn = getattr(self.local, "conn", None)
+        if conn is None:
+            return
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            try:
+                conn.close()
+            except sqlite3.Error:
+                pass
+            self.local.conn = None
 
     # ---------------------------------------------------------- background
     def poll_liquidsoap(self):

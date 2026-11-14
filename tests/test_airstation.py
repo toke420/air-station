@@ -1357,3 +1357,39 @@ class ConfigFileTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoopRecoveryTests(Base):
+    def test_failed_task_does_not_leave_a_stale_transaction(self):
+        import sqlite3
+        from unittest import mock
+        from airstation import server
+        station = server.Station(start_threads=False)
+        conn = station.conn()
+        other = db.connect(config.DB_PATH)
+
+        def record():
+            conn.execute("INSERT INTO history (started_at, source, artist, title) "
+                         "VALUES (1, 'autodj', 'A', 'T')")
+            conn.commit()
+
+        # A write that failed half-way leaves this thread's connection inside a
+        # transaction with an old snapshot; then another writer commits.
+        conn.execute("BEGIN")
+        conn.execute("SELECT COUNT(*) FROM history").fetchone()
+        db.set_setting(other, "test_key", 1)
+        other.commit()
+        with self.assertRaises(sqlite3.OperationalError):
+            record()  # 'database is locked': the stuck state seen in production
+
+        class Stop(Exception):
+            pass
+        with mock.patch.object(server.time, "sleep", side_effect=Stop), \
+                mock.patch.object(server, "log"):
+            with self.assertRaises(Stop):
+                station._loop(record, 1)  # fails once, then the loop must clean up
+
+        self.assertFalse(station.conn().in_transaction)
+        record()  # the next run works again
+        self.assertEqual(other.execute("SELECT COUNT(*) FROM history").fetchone()[0], 1)
+        other.close()
