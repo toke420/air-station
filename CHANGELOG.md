@@ -16,6 +16,14 @@
 - Music volume and pause go back to 100% / off when Liquidsoap restarts.
 - New telnet commands: `air.volume`, `air.pause`, `air.mic_token`. `config/radio.liq`
   changed (run `airctl check-config`); `radio-safe.liq` has no studio desk.
+- Microphone fixes after the first on-air use (14 Nov 2026):
+  - The `/mic` input can hold 10 s instead of 4 s. Audio that arrived late in a lump
+    overflowed the small buffer and the voice came out in pieces. While a microphone is
+    connected, Liquidsoap logs `Microphone connected: N s buffered` every 10 s.
+  - The browser levels the voice itself (automatic gain on) and the *Mic level* slider
+    goes to 400%; the voice was far too quiet under the music. Echo cancellation is
+    off, so wear headphones. Keep the computer's own microphone input at a normal
+    level: turned all the way up it clips and the voice is hard to understand.
 
 ## 2.7.0 (6 Nov 2026): search-friendly pages
 

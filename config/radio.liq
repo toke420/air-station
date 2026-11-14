@@ -129,8 +129,20 @@ mic_token = ref("")
 def mic_auth(login) =
   mic_token() != "" and login.password == mic_token()
 end
+# max: room for audio that arrives late in a lump (a network hiccup, or the silent
+# start of a connection, which alone fills about 3 s). With only 4 s the buffer
+# overflowed and the voice came out in pieces.
 mic_raw = input.harbor(id="mic_in", port=8005, auth=mic_auth,
-                       buffer=1., max=4., "mic")
+                       buffer=1., max=10., "mic")
+
+# A line in the log every 10 s while a microphone is connected, to see how far
+# behind the voice is running (airctl logs liquidsoap).
+def mic_report() =
+  if null.defined(mic_raw.connected_client()) then
+    log.important("Microphone connected: #{mic_raw.buffer_length()} s buffered")
+  end
+end
+thread.run(every=10., mic_report)
 
 live_gated = switch(id="live_gate", track_sensitive=false,
                     [({live_allowed() and live_open()}, live_audible)])

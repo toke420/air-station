@@ -293,7 +293,7 @@
     if (!mime) throw new Error("This browser has no audio format the station accepts.");
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } });
     } catch (e) {
       throw new Error(e.name === "NotAllowedError" ? "Microphone access was blocked. Allow it for this site in the browser's address bar."
         : e.name === "NotFoundError" ? "No microphone found." : "Microphone: " + e.message);
