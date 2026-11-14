@@ -16,6 +16,16 @@ docker compose pull --ignore-buildable && docker compose build
 bash scripts/airctl check-config && docker compose up -d && sleep 20 && bash scripts/check.sh
 ```
 
+If the release changed `config/radio.liq`, also recreate Liquidsoap after `up -d`:
+
+```bash
+docker compose up -d --force-recreate --no-deps liquidsoap
+```
+
+`up -d` alone does not do this: the audio config is a single mounted file, and a running
+Liquidsoap keeps the old one until its container is recreated. Listeners drop for a few
+seconds.
+
 If a release changes the systemd units, its notes say so and include the
 `install -m 644 systemd/... /etc/systemd/system/` step.
 
@@ -28,8 +38,13 @@ the full output.
 
 ```bash
 bash scripts/airctl check-config        # must print: radio.liq OK
-docker compose up -d && docker compose restart caddy && sleep 20 && bash scripts/check.sh
+docker compose up -d
+docker compose up -d --force-recreate --no-deps liquidsoap   # loads the new radio.liq
+docker compose restart caddy && sleep 20 && bash scripts/check.sh
 ```
+
+Without the `--force-recreate` line Liquidsoap keeps running the old `radio.liq` and the
+desk's buttons do nothing. Listeners drop for a few seconds.
 
 Then open Studio > Dashboard > **Studio desk** (reload the page once), press *Connect
 microphone* and allow the microphone in the browser. If `check-config` prints an error,
